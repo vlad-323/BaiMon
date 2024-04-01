@@ -12,7 +12,7 @@ This version supports Vaillant TurboTec Pro. It can be adapted to other
 boiler models using EBus interace. However, this requires knowledge of proprietary
 commands to read parameter values.
 
-Requires Arduino IDE with ESP8266 support to compile and upload to ESP8266-based controller (I run it on ESP-12E with custom PCB design board). 
+Requires Arduino IDE with ESP8266 support to compile and upload to ESP8266-based controller (I run it on ESP-07S with custom PCB design board). 
 
 Controller comminicates to the boiler using UART. Adapter is needed to adjust signal levels (EBus uses 9-20 volts).
 
