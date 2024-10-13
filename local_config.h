@@ -1,10 +1,6 @@
 // Copy this file to local_config.h and edit appropriately
 //
 
-// WiFi settings
-#define CONFIG_WIFI_SSID "mywifi"
-#define CONFIG_WIFI_PASS "mywifipassword"
-
 // Operational settings
 
 // EBus device address for BaiMon (master)
@@ -21,32 +17,10 @@
 // Delay before first poll after detecting EBus presense
 #define CONFIG_FIRST_POLL_DELAY 5
 
-// Narodmon.ru settings
+// MQTT settings
 
-// Enable server data upload
-#define CONFIG_SERVER_UPLOAD_ENABLE 1
-// Use MQTT instead of TCP for server data upload
-#define CONFIG_SERVER_USE_MQTT 0
-
-// Narodmon device ID (device MAC address)
-// should not be too long, consider ServerUploadTcp buffer limit
-#define CONFIG_SERVER_DEVICE_ID "00:00:00:00:00:00"
-// Send interval (seconds)
-#define CONFIG_SERVER_SEND_INTERVAL 600
-// Startup delay (seconds) to avoid violating narodmon max data rate
-#define CONFIG_SERVER_START_DELAY 400
-
-// TCP protocol settings
-
-// TCP server host name
-#define CONFIG_TCP_HOST "narodmon.ru"
-// TCP server port
-#define CONFIG_TCP_PORT 8283
-// TCP server reply wait timeout, ms
-#define CONFIG_TCP_REPLY_TIMEOUT 5000
-
-// MQTT protocol settings
-
+// Enable data upload to MQTT server
+#define CONFIG_MQTT_ENABLE 1
 // MQTT server host name
 #define CONFIG_MQTT_HOST "narodmon.ru"
 // MQTT server port
@@ -55,7 +29,10 @@
 #define CONFIG_MQTT_USERNAME "my_login"
 #define CONFIG_MQTT_PASSWORD "my_password"
 // MQTT client ID (narodmon: device MAC address)
-#define CONFIG_MQTT_CLIENT_ID CONFIG_SERVER_DEVICE_ID
+#define CONFIG_MQTT_CLIENT_ID "00:00:00:00:00:00"
 // MQTT topic name (narodmon: user/devname)
 #define CONFIG_MQTT_TOPIC "user/device"
-
+// Send interval (seconds)
+#define CONFIG_MQTT_SEND_INTERVAL 600
+// Startup delay (seconds) to avoid violating narodmon max data rate
+#define CONFIG_MQTT_START_DELAY 400
