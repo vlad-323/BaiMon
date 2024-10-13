@@ -26,6 +26,7 @@ extern "C" {
 char *www_username = "admin";
 char *www_password = "admin";
 const char *update_path = "/ota";
+const char *wifimac = WiFi.macAddress().c_str();
 
 #define BAIMON_VERSION "1.5"
 
@@ -1084,7 +1085,8 @@ void ProcessMqttSend() {
   PubSubClient mqttClient(wifiClient);
 
   mqttClient.setServer(CONFIG_MQTT_HOST, CONFIG_MQTT_PORT);
-  if (!mqttClient.connect(CONFIG_MQTT_CLIENT_ID, CONFIG_MQTT_USERNAME, CONFIG_MQTT_PASSWORD))
+  
+  if (!mqttClient.connect(wifimac, CONFIG_MQTT_USERNAME, CONFIG_MQTT_PASSWORD))
     return;
 
   mqttClient.publish(CONFIG_MQTT_TOPIC "/status", "online");
