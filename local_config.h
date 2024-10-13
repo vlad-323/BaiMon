@@ -28,8 +28,6 @@
 // MQTT user name and password
 #define CONFIG_MQTT_USERNAME "my_login"
 #define CONFIG_MQTT_PASSWORD "my_password"
-// MQTT client ID (narodmon: device MAC address)
-#define CONFIG_MQTT_CLIENT_ID "00:00:00:00:00:00"
 // MQTT topic name (narodmon: user/devname)
 #define CONFIG_MQTT_TOPIC "user/device"
 // Send interval (seconds)
