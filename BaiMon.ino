@@ -16,6 +16,7 @@ extern "C" {
 #include <PubSubClient.h>
 #include <DNSServer.h>
 #include <WiFiManager.h>
+#include <ESP8266HTTPUpdateServer.h>
 
 #include "local_config.h"
 
@@ -24,8 +25,9 @@ extern "C" {
 
 char *www_username = "admin";
 char *www_password = "admin";
+const char *update_path = "/ota";
 
-#define BAIMON_VERSION "1.4"
+#define BAIMON_VERSION "1.5"
 
 #define EBUS_SLAVE_ADDR(MASTER) ((MASTER) + 5)
 
@@ -70,6 +72,7 @@ void SetupWifi() {
   //WiFiManagerParameter www_password_param("www_password", "Web Password", www_password, 15);
   
   WiFiManager wifiManager;
+  wifiManager.setConfigPortalTimeout(240); // после 4х мин точка доступа пропадает
   
   
   //wifiManager.addParameter(&www_username_param);
@@ -815,6 +818,7 @@ void ProcessIndication() {
 // Web server
 
 ESP8266WebServer g_webServer(80);
+ESP8266HTTPUpdateServer httpUpdater;
 
 void webResponseBegin(String &resp, int refresh) {
   resp.concat("<html><head>");
@@ -857,8 +861,17 @@ void webHandleRoot() {
   resp.concat(g_syncOk ? "<span style=\"color:green;\">OK</span>" : "<span style=\"color:red;\">FAIL</span>");
 
   resp.concat("<form action=\"/request-data\" method=\"POST\" enctype=\"application/x-www-form-urlencoded\">");
-  resp.concat("<button type=\"submit\">Request data</button>");
+  resp.concat("<button type=\"submit\">Request Data</button>");
   resp.concat("</form>");
+
+  resp.concat("<form action=\"/ota\" method=\"GET\" enctype=\"application/x-www-form-urlencoded\">");
+  resp.concat("<button type=\"submit\">Firmware Update</button>");
+  resp.concat("</form>"); 
+
+  resp.concat("<form action=\"/reset\" method=\"GET\" enctype=\"application/x-www-form-urlencoded\" onsubmit=\"return confirm('Warning! WiFi settings will be erased');\">");
+  resp.concat("<button type=\"submit\" style=\"background-color: red; color: white;\">Erase Configuration</button>");
+  resp.concat("</form>");
+
 
   resp.concat("<hr>Measurement history:<br><table border=\"0\"><tr><th>Time</th><th>State</th><th>Temperature,C</th><th>Pressure,Bar</th><th>Retries</th></tr>");
   for (uint32 i = 0, cnt = (g_parmHistorySize > WEB_PARM_HISTORY) ? WEB_PARM_HISTORY : g_parmHistorySize; i != cnt; ++i) {
@@ -999,6 +1012,16 @@ void webHandleDiag() {
   g_webServer.send(200, "text/html", resp);
 }
 
+void webHandleReset() {
+  if (!g_webServer.authenticate(www_username, www_password)) {
+    return g_webServer.requestAuthentication();
+  }
+  WiFiManager wifiManager;
+  wifiManager.resetSettings();
+  delay(500);
+  ESP.restart();
+  delay(1000);
+}
 void webHandleNotFound() {
   String message = "404 Not Found\n\n";
   message += "URI: ";
@@ -1015,9 +1038,12 @@ void webHandleNotFound() {
 }
 
 void SetupWebServer() {
+  httpUpdater.setup(&g_webServer, update_path, www_username, www_password);
+
   g_webServer.on("/", webHandleRoot);
   g_webServer.on("/request-data", webHandleRequestData);
   g_webServer.on("/diag", webHandleDiag);
+  g_webServer.on("/reset", webHandleReset);
   g_webServer.onNotFound(webHandleNotFound);
   g_webServer.begin();
 }
