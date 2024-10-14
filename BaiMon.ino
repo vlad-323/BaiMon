@@ -9,26 +9,39 @@ extern "C" {
 #include "user_interface.h"
 }
 
-//#include <FS.h>
+#include <LittleFS.h>
+#include <FS.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <WiFiClient.h>
 #include <PubSubClient.h>
-#include <DNSServer.h>
 #include <WiFiManager.h>
 #include <ESP8266HTTPUpdateServer.h>
+#include <ArduinoJson.h> 
 
 #include "local_config.h"
 
 /////////////////////////////////////////////////////////////
 // Defines
+char mqtt_server[40];
+char mqtt_port[6] = "1883";
+char mqtt_login[11];
+char mqtt_passwd[21];
+char web_passwd[21] = "admin";
+char web_login[11] = "admin";
 
-char *www_username = "admin";
-char *www_password = "admin";
+//flag for saving data
+bool shouldSaveConfig = false;
+
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  shouldSaveConfig = true;
+}
+
 const char *update_path = "/ota";
 const char *wifimac = WiFi.macAddress().c_str();
 
-#define BAIMON_VERSION "1.5"
+#define BAIMON_VERSION "1.6"
 
 #define EBUS_SLAVE_ADDR(MASTER) ((MASTER) + 5)
 
@@ -65,24 +78,100 @@ enum  // EBus addresses
 // WiFi
 
 void SetupWifi() {
-  //WiFi.mode(WIFI_STA);
-  //WiFi.begin(CONFIG_WIFI_SSID, CONFIG_WIFI_PASS);
+  if (LittleFS.begin()) {
+    if (LittleFS.exists("/config.json")) {
+      //file exists, reading and loading
+      File configFile = LittleFS.open("/config.json", "r");
+      if (configFile) {
+        size_t size = configFile.size();
+        // Allocate a buffer to store contents of the file.
+        std::unique_ptr<char[]> buf(new char[size]);
+
+        configFile.readBytes(buf.get(), size);
+
+        DynamicJsonDocument json(1024);
+        auto deserializeError = deserializeJson(json, buf.get());
+        //serializeJson(json, Serial);
+        if ( ! deserializeError ) {
+
+          strcpy(mqtt_server, json["mqtt_server"]);
+          strcpy(mqtt_port, json["mqtt_port"]);
+          strcpy(mqtt_login, json["mqtt_login"]);
+          strcpy(mqtt_passwd, json["mqtt_passwd"]);
+          strcpy(web_passwd, json["web_passwd"]);
+          strcpy(web_login, json["web_login"]);
+        } 
+        else {
+          //Serial.println("failed to load json config");
+        }
+        configFile.close();
+      }
+    }
+  } 
+
+  // The extra parameters to be configured (can be either global or just in the setup)
+  // After connecting, parameter.getValue() will get you the configured value
+  // id/name placeholder/prompt default length
+  WiFiManagerParameter custom_mqtt_server("mqttserver", "MQTT server IP", mqtt_server, 40);
+  WiFiManagerParameter custom_mqtt_port("mqttport", "MQTT server port", mqtt_port, 6);
+  WiFiManagerParameter custom_mqtt_login("mqttlogin", "MQTT server login", mqtt_login, 11);
+  WiFiManagerParameter custom_mqtt_passwd("mqttpasswd", "MQTT server password", mqtt_passwd, 21);
+  WiFiManagerParameter custom_web_passwd("webpasswd", "Web server password", web_passwd, 21);
+  WiFiManagerParameter custom_web_login("weblogin", "Web server login", web_login, 11);
   
-  // Parameters NOT SAVING, need to FIX!
-  //WiFiManagerParameter www_username_param("www_username", "Web Login", www_username, 10);
-  //WiFiManagerParameter www_password_param("www_password", "Web Password", www_password, 15);
-  
+  pinMode(RESETBTN, INPUT_PULLUP);
+
   WiFiManager wifiManager;
+
+  // Сброс настроек, если зажата кнопка при включении
+  if (digitalRead(RESETBTN) == LOW){      
+        wifiManager.resetSettings();
+        delay(500);
+        ESP.restart();
+        delay(1000);
+    }
+
+  //set config save notify callback
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+  //add all your parameters here
+  wifiManager.addParameter(&custom_mqtt_server);
+  wifiManager.addParameter(&custom_mqtt_port);
+  wifiManager.addParameter(&custom_mqtt_login);
+  wifiManager.addParameter(&custom_mqtt_passwd);
+  wifiManager.addParameter(&custom_web_passwd);
+  wifiManager.addParameter(&custom_web_login);
+
+  wifiManager.setDebugOutput(false);
   wifiManager.setConfigPortalTimeout(240); // после 4х мин точка доступа пропадает
-  
-  
-  //wifiManager.addParameter(&www_username_param);
-  //wifiManager.addParameter(&www_password_param);
-  
+    
   wifiManager.autoConnect("ESP-Ebus bridge", "12345678");
 
-  //strcpy(www_username, www_username_param.getValue());
-  //strcpy(www_password, www_password_param.getValue());
+  //read updated parameters
+  strcpy(mqtt_server, custom_mqtt_server.getValue());
+  strcpy(mqtt_port, custom_mqtt_port.getValue());
+  strcpy(mqtt_login, custom_mqtt_login.getValue());
+  strcpy(mqtt_passwd, custom_mqtt_passwd.getValue());
+  strcpy(web_passwd, custom_web_passwd.getValue());
+  strcpy(web_login, custom_web_login.getValue());
+
+    if (shouldSaveConfig) {
+    DynamicJsonDocument json(1024);
+
+    json["mqtt_server"] = mqtt_server;
+    json["mqtt_port"] = mqtt_port;
+    json["mqtt_login"] = mqtt_login;
+    json["mqtt_passwd"] = mqtt_passwd;
+    json["web_passwd"] = web_passwd;
+    json["web_login"] = web_login;
+
+    File configFile = LittleFS.open("/config.json", "w");
+
+    serializeJson(json, configFile);
+    configFile.close();
+    //end save
+  }
+
 }
 
 /////////////////////////////////////////////////////////////
@@ -839,7 +928,7 @@ void webResponseEnd(String &resp) {
 }
 
 void webHandleRoot() {
-  if (!g_webServer.authenticate(www_username, www_password)) {
+  if (!g_webServer.authenticate(web_login, web_passwd)) {
     return g_webServer.requestAuthentication();
   }
   uint32 t = millis();
@@ -869,7 +958,7 @@ void webHandleRoot() {
   resp.concat("<button type=\"submit\">Firmware Update</button>");
   resp.concat("</form>"); 
 
-  resp.concat("<form action=\"/reset\" method=\"GET\" enctype=\"application/x-www-form-urlencoded\" onsubmit=\"return confirm('Warning! WiFi settings will be erased');\">");
+  resp.concat("<form action=\"/reset\" method=\"GET\" enctype=\"application/x-www-form-urlencoded\" onsubmit=\"return confirm('Warning! All settings will be erased!');\">");
   resp.concat("<button type=\"submit\" style=\"background-color: red; color: white;\">Erase Configuration</button>");
   resp.concat("</form>");
 
@@ -932,7 +1021,7 @@ void webHandleRequestData() {
 }
 
 void webHandleDiag() {
-  if (!g_webServer.authenticate(www_username, www_password)) {
+  if (!g_webServer.authenticate(web_login, web_passwd)) {
     return g_webServer.requestAuthentication();
   }
   uint32 byteCount = g_serialByteCount;
@@ -1014,7 +1103,7 @@ void webHandleDiag() {
 }
 
 void webHandleReset() {
-  if (!g_webServer.authenticate(www_username, www_password)) {
+  if (!g_webServer.authenticate(web_login, web_passwd)) {
     return g_webServer.requestAuthentication();
   }
   WiFiManager wifiManager;
@@ -1039,7 +1128,7 @@ void webHandleNotFound() {
 }
 
 void SetupWebServer() {
-  httpUpdater.setup(&g_webServer, update_path, www_username, www_password);
+  httpUpdater.setup(&g_webServer, update_path, web_login, web_passwd);
 
   g_webServer.on("/", webHandleRoot);
   g_webServer.on("/request-data", webHandleRequestData);
@@ -1063,7 +1152,6 @@ enum {
 
 
 void ProcessMqttSend() {
-#if CONFIG_MQTT_ENABLE
 
   if (g_syncOk && g_lastResultSent)
     return;
@@ -1084,32 +1172,32 @@ void ProcessMqttSend() {
   WiFiClient wifiClient;
   PubSubClient mqttClient(wifiClient);
 
-  mqttClient.setServer(CONFIG_MQTT_HOST, CONFIG_MQTT_PORT);
+  mqttClient.setServer(mqtt_server, atoi(mqtt_port));
   
-  if (!mqttClient.connect(wifimac, CONFIG_MQTT_USERNAME, CONFIG_MQTT_PASSWORD))
+  if (!mqttClient.connect(wifimac, mqtt_login, mqtt_passwd))
     return;
 
-  mqttClient.publish(CONFIG_MQTT_TOPIC "/status", "online");
+  mqttClient.publish(CONFIG_MQTT_TOPIC "/status", "Online");
 
   char msgBuf[32];
 
   const uint32 state = g_syncOk ? g_lastState : 255;
   snprintf(msgBuf, sizeof(msgBuf), "%u", state);
-  mqttClient.publish(CONFIG_MQTT_TOPIC "/S1", msgBuf);
+  mqttClient.publish(CONFIG_MQTT_TOPIC "/mode", msgBuf);
 
   if (g_lastResultValid) {
     snprintf(msgBuf, sizeof(msgBuf), "%d.%02u", g_lastTempValue / 16, (g_lastTempValue & 0xF) * 100 / 16);
-    mqttClient.publish(CONFIG_MQTT_TOPIC "/T1", msgBuf);
+    mqttClient.publish(CONFIG_MQTT_TOPIC "/tempcurr", msgBuf);
 
     snprintf(msgBuf, sizeof(msgBuf), "%d.%02u", g_lastPressValue / 1000, (g_lastPressValue % 1000) / 10);
-    mqttClient.publish(CONFIG_MQTT_TOPIC "/P1", msgBuf);
+    mqttClient.publish(CONFIG_MQTT_TOPIC "/pressure", msgBuf);
   }
 
   mqttClient.disconnect();
 
   g_lastResultSent = true;
 
-#endif  // CONFIG_MQTT_ENABLE
+
 }
 
 /////////////////////////////////////////////////////////////
