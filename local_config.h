@@ -19,18 +19,12 @@
 
 // MQTT settings
 
-// Enable data upload to MQTT server
-#define CONFIG_MQTT_ENABLE 1
-// MQTT server host name
-#define CONFIG_MQTT_HOST "narodmon.ru"
-// MQTT server port
-#define CONFIG_MQTT_PORT 1883
-// MQTT user name and password
-#define CONFIG_MQTT_USERNAME "my_login"
-#define CONFIG_MQTT_PASSWORD "my_password"
-// MQTT topic name (narodmon: user/devname)
-#define CONFIG_MQTT_TOPIC "user/device"
+// MQTT topic name
+#define CONFIG_MQTT_TOPIC "ebus/vaillant"
 // Send interval (seconds)
-#define CONFIG_MQTT_SEND_INTERVAL 600
-// Startup delay (seconds) to avoid violating narodmon max data rate
-#define CONFIG_MQTT_START_DELAY 400
+#define CONFIG_MQTT_SEND_INTERVAL 60
+// Startup delay (seconds)
+#define CONFIG_MQTT_START_DELAY 40
+
+// Push button at GPIO5 before power on and settings will be erased
+#define RESETBTN 5
