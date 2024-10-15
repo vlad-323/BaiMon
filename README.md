@@ -19,6 +19,11 @@ Controller comminicates to the boiler using UART. Adapter is needed to adjust si
 EBus-adapter.pdf contains schematics of a simple EBus adapter.
 It can be connected directly to ESP8266 outputs due to optical decoupling.
 
+**Factory made PCB:**
+
+![photo_2024-10-15_11-24-23](https://github.com/user-attachments/assets/2dc630aa-241f-49d6-a961-c7841dcdcdc7)
+![photo_2024-10-15_11-24-25](https://github.com/user-attachments/assets/675da22a-cb2a-457a-8124-40a7b2fb43ae)
+
 **New mainpage:**
 
 ![image](https://github.com/user-attachments/assets/cd86eedd-aba3-494f-99c4-bde7c88e4f8f)
