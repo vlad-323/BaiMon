@@ -26,7 +26,7 @@ It can be connected directly to ESP8266 outputs due to optical decoupling.
 
 **New mainpage:**
 
-![image](https://github.com/user-attachments/assets/cd86eedd-aba3-494f-99c4-bde7c88e4f8f)
+![image](https://github.com/user-attachments/assets/5b6bd65a-aa08-441b-9885-8d9e6943731a)
 
 **Firmware update page:**
 
