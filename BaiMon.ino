@@ -39,7 +39,6 @@ void saveConfigCallback () {
 }
 
 const char *update_path = "/ota";
-const char *wifimac = WiFi.macAddress().c_str();
 
 #define BAIMON_VERSION "1.6"
 
@@ -177,7 +176,7 @@ void SetupWifi() {
 /////////////////////////////////////////////////////////////
 // EBus utilites
 
-uint8 ICACHE_RAM_ATTR Crc8Byte(uint8 data, uint8 crc) {
+uint8 IRAM_ATTR Crc8Byte(uint8 data, uint8 crc) {
   for (unsigned int i = 0; i < 8; i++) {
     const uint8 polynom = (crc & 0x80) ? 0x9B : 0;
 
@@ -191,7 +190,7 @@ uint8 ICACHE_RAM_ATTR Crc8Byte(uint8 data, uint8 crc) {
   return crc;
 }
 
-uint8 ICACHE_RAM_ATTR Crc8Buf(const void *buf, uint32 len) {
+uint8 IRAM_ATTR Crc8Buf(const void *buf, uint32 len) {
   uint8 crc = 0;
   const uint8 *p = (const uint8 *)buf;
   for (; len != 0; --len)
@@ -353,7 +352,7 @@ struct EBusCommand {
 
 volatile EBusCommand *g_activeCommand = 0;
 
-bool ICACHE_RAM_ATTR RetryOrFail(volatile EBusCommand *cmd) {
+bool IRAM_ATTR RetryOrFail(volatile EBusCommand *cmd) {
   if (cmd->m_retryCount >= CMD_MAX_RETRIES) {
     cmd->m_state = EBusCommand::CmdError;
     g_activeCommand = cmd->m_next_cmd;
@@ -371,11 +370,11 @@ bool ICACHE_RAM_ATTR RetryOrFail(volatile EBusCommand *cmd) {
 }
 
 // Send byte to EBus
-void ICACHE_RAM_ATTR SendChar(uint8 ch) {
+void IRAM_ATTR SendChar(uint8 ch) {
   WRITE_PERI_REG(UART_FIFO(UART_EBUS), ch);
 }
 
-void ICACHE_RAM_ATTR ProcessReceive(int st) {
+void IRAM_ATTR ProcessReceive(int st) {
   uint32 t = millis();
 
   volatile EBusCommand *cmd = g_activeCommand;
@@ -521,7 +520,7 @@ void ICACHE_RAM_ATTR ProcessReceive(int st) {
 
 #define CHECK_INT_STATUS(ST, MASK) (((ST) & (MASK)) == (MASK))
 
-void ICACHE_RAM_ATTR uart_int_handler(void *va) {
+void IRAM_ATTR uart_int_handler(void) {
   for (;;) {
     const uint32 uartIntStatus = READ_PERI_REG(UART_INT_ST(UART_EBUS));
     if (uartIntStatus == 0)
@@ -889,7 +888,7 @@ void SetupIndication() {
 }
 
 void ProcessIndication() {
-  uint32 t = millis();
+  //uint32 t = millis();
 
   if (WiFi.status() == WL_CONNECTED)
     SetWifiLedOn();
@@ -1172,9 +1171,10 @@ void ProcessMqttSend() {
   WiFiClient wifiClient;
   PubSubClient mqttClient(wifiClient);
 
-  mqttClient.setServer(mqtt_server, atoi(mqtt_port));
+  uint16_t mqttPort = static_cast<uint16_t>(atoi(mqtt_port));
+  mqttClient.setServer(mqtt_server, mqttPort);
   
-  if (!mqttClient.connect(wifimac, mqtt_login, mqtt_passwd))
+  if (!mqttClient.connect(WiFi.macAddress().c_str(), mqtt_login, mqtt_passwd))
     return;
 
   mqttClient.publish(CONFIG_MQTT_TOPIC "/status", "Online");
