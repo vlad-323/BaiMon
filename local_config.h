@@ -11,20 +11,20 @@
 // EBus device poll intervals (seconds)
 
 // EBus poll interval when last command succeeded
-#define CONFIG_POLL_INTERVAL_NORM 600
+#define CONFIG_POLL_INTERVAL_NORM 60
 // EBus poll interval whan last command failed
-#define CONFIG_POLL_INTERVAL_FAIL 60
+#define CONFIG_POLL_INTERVAL_FAIL 30
 // Delay before first poll after detecting EBus presense
 #define CONFIG_FIRST_POLL_DELAY 5
 
 // MQTT settings
-
 // MQTT topic name
 #define CONFIG_MQTT_TOPIC "ebus/vaillant"
 // Send interval (seconds)
 #define CONFIG_MQTT_SEND_INTERVAL 60
 // Startup delay (seconds)
-#define CONFIG_MQTT_START_DELAY 40
+#define CONFIG_MQTT_START_DELAY 30
+
 
 // Push button at GPIO5 before power on and settings will be erased
 #define RESETBTN 5
