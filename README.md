@@ -26,7 +26,7 @@ It can be connected directly to ESP8266 outputs due to optical decoupling.
 
 **New mainpage:**
 
-![image](https://github.com/user-attachments/assets/5b6bd65a-aa08-441b-9885-8d9e6943731a)
+![image](https://github.com/user-attachments/assets/39f02201-f54d-4785-a5b2-33afb850300e)
 
 **Firmware update page:**
 
@@ -41,7 +41,15 @@ It can be connected directly to ESP8266 outputs due to optical decoupling.
 mqtt:
   sensor:
     - name: "Температура теплоносителя"
-      state_topic: "ebus/vaillant/tempcurr" #T1
+      state_topic: "ebus/vaillant/tempcurr" 
+      value_template: '{{ value }}'
+      unit_of_measurement: "°C"
+      availability_topic: "ebus/vaillant/status"
+      payload_available: "Online"
+      payload_not_available: "Offline"
+
+    - name: "Уставка температуры"
+      state_topic: "ebus/vaillant/tempset" 
       value_template: '{{ value }}'
       unit_of_measurement: "°C"
       availability_topic: "ebus/vaillant/status"
@@ -49,7 +57,7 @@ mqtt:
       payload_not_available: "Offline"
     
     - name: "Давление воды"
-      state_topic: "ebus/vaillant/pressure" #P1
+      state_topic: "ebus/vaillant/pressure" 
       value_template: '{{ value }}'
       unit_of_measurement: "bar"
       availability_topic: "ebus/vaillant/status"
@@ -57,7 +65,7 @@ mqtt:
       payload_not_available: "Offline"
     
     - name: "Режим работы"
-      state_topic: "ebus/vaillant/mode" #S1
+      state_topic: "ebus/vaillant/mode" 
       value_template: '{{ value }}'
       unit_of_measurement: "mode"
       availability_topic: "ebus/vaillant/status"
