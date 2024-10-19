@@ -2,6 +2,8 @@
 //
 //
 
+// 765 CHECK!
+
 #include "esp8266_peri.h"
 #include "uart_register.h"
 
@@ -339,6 +341,22 @@ struct EBusCommand {
     return (short)((unsigned int)m_respData[1] << 8 | m_respData[0]);
   }
 
+  ////////////////////
+
+  void PrepGetTempSet(unsigned int addrFrom, unsigned int addrTo)
+  {
+    PrepGetParm(addrFrom, addrTo, 0x39, 2); 
+  }
+
+  // returns temperature (in 1/16 C)
+  short GetTempSetValue() const
+  {
+    if (! IsSuccess())
+      return INVALID_TEMPERATURE_VALUE;
+    return (short)((unsigned int)m_respData[1] << 8 | m_respData[0]);
+  }
+////////////////////
+
   void PrepGetPressure(unsigned int addrFrom, unsigned int addrTo) {
     PrepGetParm(addrFrom, addrTo, 0x02, 3);
   }
@@ -579,6 +597,7 @@ struct ParmHistData {
   uint32 m_timeStamp;
   uint32 m_byteIndex;
   short m_temperature;
+  short  m_tempset;
   unsigned short m_pressure;
   uint8 m_state;
   uint8 m_retries;
@@ -683,6 +702,7 @@ uint32 g_requestData = false;  // Flag: request data immediately
 // EBus commands processed by interrupt handler
 EBusCommand g_monGetState;
 EBusCommand g_monGetTemp;
+EBusCommand g_monGetTempSet;
 EBusCommand g_monGetPress;
 
 // MQTT data upload
@@ -690,6 +710,7 @@ uint32 g_lastResultValid = false;
 uint32 g_lastResultSent = false;
 uint32 g_lastState = 0;
 uint32 g_lastTempValue = 0;
+uint32 g_lastTempSetValue = 0;
 uint32 g_lastPressValue = 0;
 
 uint32 g_lastMqttSendTime = 0;
@@ -721,18 +742,19 @@ void ProcessMonitor() {
   if (g_monCmdActive) {
     if (g_activeCommand == 0 || t - g_lastMonitorTime > COMMAND_TIMEOUT) {
       // stop active monitor command, if any
-      if (g_activeCommand == &g_monGetState || g_activeCommand == &g_monGetTemp || g_activeCommand == &g_monGetPress)
+      if (g_activeCommand == &g_monGetState || g_activeCommand == &g_monGetTemp || g_activeCommand == &g_monGetTempSet || g_activeCommand == &g_monGetPress)
         g_activeCommand = 0;
 
       g_monCmdActive = false;
 
       // check last command result
-      g_lastCmdSucceed = g_monGetState.IsSuccess() && g_monGetTemp.IsSuccess() && g_monGetPress.IsSuccess();
+      g_lastCmdSucceed = g_monGetState.IsSuccess() && g_monGetTemp.IsSuccess() && g_monGetTempSet.IsSuccess() && g_monGetPress.IsSuccess();
 
       ParmHistData &parmData = g_parmHistory[g_parmHistorySize % MAX_PARM_HISTORY];
       parmData.m_timeStamp = g_lastMonitorTime;
       parmData.m_byteIndex = g_monGetState.m_byteIndex;  // should use first command in chain
       parmData.m_temperature = g_monGetTemp.GetTemperatureValue();
+      parmData.m_tempset = g_monGetTempSet.GetTempSetValue();
       parmData.m_pressure = g_monGetPress.GetPressureValue();
       parmData.m_state = g_monGetState.GetStateValue();
       parmData.m_retries = g_monGetState.m_retryCount + g_monGetTemp.m_retryCount + g_monGetPress.m_retryCount;
@@ -742,8 +764,9 @@ void ProcessMonitor() {
       g_lastResultSent = false;
       g_lastState = parmData.m_state;
 
-      if (parmData.m_temperature != INVALID_TEMPERATURE_VALUE && parmData.m_pressure != INVALID_PRESSURE_VALUE) {
+      if (parmData.m_temperature != INVALID_TEMPERATURE_VALUE && parmData.m_tempset != INVALID_TEMPERATURE_VALUE && parmData.m_pressure != INVALID_PRESSURE_VALUE) {
         g_lastTempValue = parmData.m_temperature;
+        g_lastTempSetValue = parmData.m_tempset;
         g_lastPressValue = parmData.m_pressure;
         g_lastResultValid = true;
       } else {
@@ -789,9 +812,12 @@ void ProcessMonitor() {
       // Build EBus command chain
       g_monGetState.PrepGetState(EBUS_ADDR_HOST, EBUS_ADDR_BOILER);
       g_monGetTemp.PrepGetTemperature(EBUS_ADDR_HOST, EBUS_ADDR_BOILER);
+	    g_monGetTempSet.PrepGetTempSet(EBUS_ADDR_HOST, EBUS_ADDR_BOILER);
       g_monGetPress.PrepGetPressure(EBUS_ADDR_HOST, EBUS_ADDR_BOILER);
+      // НЕПОНЯТНАЯ ШНЯГА, РАЗОБРАТЬСЯ! 	  
       g_monGetState.m_next_cmd = &g_monGetTemp;
-      g_monGetTemp.m_next_cmd = &g_monGetPress;
+	    g_monGetTemp.m_next_cmd = &g_monGetTempSet;
+      g_monGetTempSet.m_next_cmd = &g_monGetPress;
       // Enable command processing by interrupt handler
       g_activeCommand = &g_monGetState;
     }
@@ -962,7 +988,7 @@ void webHandleRoot() {
   resp.concat("</form>");
 
 
-  resp.concat("<hr>Measurement history:<br><table border=\"0\"><tr><th>Time</th><th>State</th><th>Temperature,C</th><th>Pressure,Bar</th><th>Retries</th></tr>");
+  resp.concat("<hr>Measurement history:<br><table border=\"0\"><tr><th>Time</th><th>State</th><th>Temperature,C</th><th>Temperature target,C</th><th>Pressure,Bar</th><th>Retries</th></tr>");
   for (uint32 i = 0, cnt = (g_parmHistorySize > WEB_PARM_HISTORY) ? WEB_PARM_HISTORY : g_parmHistorySize; i != cnt; ++i) {
     const ParmHistData &parmData = g_parmHistory[(g_parmHistorySize - i - 1) % MAX_PARM_HISTORY];
 
@@ -980,6 +1006,15 @@ void webHandleRoot() {
     else
       sprintf(tempBuf, "%d.%02u", parmData.m_temperature / 16, (parmData.m_temperature & 0xF) * 100 / 16);
 
+    // target Temp
+    char TargTempBuf[20];
+    const char *TargTempStr = TargTempBuf;
+    if (parmData.m_tempset == INVALID_TEMPERATURE_VALUE)
+      TargTempStr = "<span style=\"color:red\">ERROR</span>";
+    else
+      sprintf(TargTempBuf, "%d.%02u", parmData.m_tempset/16, (parmData.m_tempset & 0xF)*100/16);
+
+
     char pressBuf[20];
     const char *pressStr = pressBuf;
     if (parmData.m_pressure == INVALID_PRESSURE_VALUE)
@@ -993,14 +1028,13 @@ void webHandleRoot() {
     uint32 dthr = dtmin / 60;
 
     char buf[400];
-    sprintf(buf, "<tr><td>-%02u:%02u:%02u</td><td>%s</td><td>%s</td><td>%s</td><td>%u</td></tr>",
-            dthr, dtmin % 60, dtsec % 60, stateStr, tempStr, pressStr, parmData.m_retries);
+    sprintf(buf, "<tr><td>-%02u:%02u:%02u</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%u</td></tr>",
+      dthr, dtmin % 60, dtsec % 60, stateStr, tempStr, TargTempStr, pressStr, parmData.m_retries);
     resp.concat(buf);
   }
   resp.concat("</table>");
 
   resp.concat("<hr><a href=\"/diag\">[Diagnostics]</a>");
-  //resp.concat("<hr><a href=\"/update\">[Firmware Update]</a>");
 
   webResponseEnd(resp);
 
@@ -1188,6 +1222,9 @@ void ProcessMqttSend() {
   if (g_lastResultValid) {
     snprintf(msgBuf, sizeof(msgBuf), "%d.%02u", g_lastTempValue / 16, (g_lastTempValue & 0xF) * 100 / 16);
     mqttClient.publish(CONFIG_MQTT_TOPIC "/tempcurr", msgBuf);
+
+    snprintf(msgBuf, sizeof(msgBuf), "%d.%02u", g_lastTempSetValue / 16, (g_lastTempSetValue & 0xF) * 100 / 16);
+    mqttClient.publish(CONFIG_MQTT_TOPIC "/tempset", msgBuf);
 
     snprintf(msgBuf, sizeof(msgBuf), "%d.%02u", g_lastPressValue / 1000, (g_lastPressValue % 1000) / 10);
     mqttClient.publish(CONFIG_MQTT_TOPIC "/pressure", msgBuf);
