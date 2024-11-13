@@ -24,6 +24,10 @@ It can be connected directly to ESP8266 outputs due to optical decoupling.
 ![photo_2024-10-15_11-24-23](https://github.com/user-attachments/assets/2dc630aa-241f-49d6-a961-c7841dcdcdc7)
 ![photo_2024-10-15_11-24-25](https://github.com/user-attachments/assets/675da22a-cb2a-457a-8124-40a7b2fb43ae)
 
+**Installed device in boiler:**
+
+![photo_2024-11-13_17-59-51](https://github.com/user-attachments/assets/8e27019e-03ec-42e1-9b02-e9841243048f)
+
 **New mainpage:**
 
 ![image](https://github.com/user-attachments/assets/39f02201-f54d-4785-a5b2-33afb850300e)
